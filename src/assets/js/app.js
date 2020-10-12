@@ -103,7 +103,7 @@ $(document).ready(function(){
                 // remove double spaces, split by space, and filter out empty strings
                 let searchTerms = searchString.replace(/ +(?= )/g,'').split(" ").filter(x => x.length > 0);
                 // perform the search for each term
-                let allHits = searchTerms.every(term => text.search(term.toLowerCase()) !== -1);
+                let allHits = searchTerms.every(term => text.includes(term.toLowerCase()));
                 // put to hide, if no hit was found
                 if(!allHits) {
                     hide.push(anchorDiv);
@@ -145,27 +145,42 @@ $(document).ready(function(){
     let searchField = document.getElementById("faq-search");
     if(searchField !== null){
         let faq = {};
-        // determine the right filename suffix based on the path
-        let lang = window.location.pathname.slice(0,3);
-        let fn = "faq" + (lang === "/de" ? "_de" : "") + ".json";
-
-        // do an AJAX call to get the right FAQ document
-        $.get("/assets/data/" + fn, (data) => {
+        // do an AJAX call to get the searchable FAQ document
+        // Converter ensures that even malformed mime-types are converted directly to JSON
+        $.get({url: "faq.json", converters: {"text html": jQuery.parseJSON}}, (data) => {
             faq = data;
             let faqCount = Object.keys(data).length.toString();
             document.getElementById("match-count").innerHTML = faqCount + "/" + faqCount;
 
             // find out whether there are search strings added
             var urlParams = new URLSearchParams(window.location.search);
+            const { hash } = window.location;
             if(urlParams.has("search")){
-                const { hash } = window.location;
-                // if we have a deeplink w/ a hash, ignore the search parameter
+                // only perform search if no hash is set
                 if(!hash || hash === "") {
-                    // otherwise, set the search string in the input
+                    // set the search string in the input
                     searchField.value = urlParams.get("search");
                     // and update the result list
                     updateResults(urlParams.get("search"), faq);
                 }
+            }
+            // if we have a hash and that hash is not part of the faq list
+            let hashVal = hash.substring(1)
+            if(hash && !Object.keys(faq).includes(hashVal)) {
+                // then let's get the list of defined redirects
+                $.get("/assets/data/faq_redirects.json", (data) => {
+                    // and see whether there is a proper replacement (1:1 mapping)
+                    let replacement = data[hashVal];
+                    // if there is ...
+                    if(replacement){
+                        // ... just go there
+                        location.hash = "#" + replacement;
+                    } else {
+                        // otherwise, just search for the hash value
+                        searchField.value = hashVal;
+                        updateResults(hashVal, faq);
+                    }
+                })
             }
         });
 
@@ -196,4 +211,13 @@ $(document).ready(function(){
             history.pushState("", document.title, window.location.pathname + window.location.search);
         })
     }
+
+    // smooth scrolling to anchor tag when clicking anchor link
+    $('a[href^="#"]').on('click', function (event) {
+        event.preventDefault();
+
+        $('html, body').animate({
+            scrollTop: $($.attr(this, 'href')).offset().top
+        }, 600);
+    });
 });

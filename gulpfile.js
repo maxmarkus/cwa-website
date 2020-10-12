@@ -15,6 +15,7 @@ const rimraf = require('rimraf');
 const webp = require('gulp-webp');
 const jsonTransform = require('gulp-json-transform');
 const { processBlogFiles } = require('./src/services/blog-processor');
+var rename = require("gulp-rename");
 
 // Load all Gulp plugins into one variable
 const $ = plugins();
@@ -38,10 +39,21 @@ function isCI() {
 // Sass must be run later so UnCSS can search for used classes in the others assets.
 gulp.task(
   'build',
-  gulp.series(clean, buildBlogFiles, gulp.parallel(pages, javascript, images_minify, copy, copyFAQs), images_webp, sass, build_sitemap)
+  gulp.series(
+    clean,
+    cleanBlogs,
+    buildBlogFiles,
+    gulp.parallel(
+      pages, javascript, images_minify, copy, copyFAQs, copyFAQRedirects
+    ),
+    images_webp,
+    sass,
+    build_sitemap,
+    createFaqRedirects
+  )
 );
 
-gulp.task('blog', buildBlogFiles);
+gulp.task('blog', gulp.series(cleanBlogs, buildBlogFiles));
 
 // Build the site, run the server, and watch for file changes
 gulp.task('default', gulp.series('build', server, watch));
@@ -50,6 +62,10 @@ gulp.task('default', gulp.series('build', server, watch));
 // This happens every time a build starts
 function clean(done) {
   rimraf(PATHS.dist, done);
+}
+
+function cleanBlogs(done) {
+  rimraf(PATHS.blogOutputs, done);
 }
 
 // Copy files out of the assets folder
@@ -178,20 +194,31 @@ function images_webp() {
     .pipe(gulp.dest(PATHS.dist + '/assets/img'));
 }
 
-function copyFAQs() {
+function copyFAQs(done){
+  copyFAQ("de");
+  copyFAQ("en");
+  done();
+}
+
+function copyFAQ(lang) {
   return gulp
-    .src(["src/data/faq.json", "src/data/faq_de.json"])
+    .src(`src/data/faq${(lang === "en" ? "" : ("_" + lang))}.json`)
     .pipe(jsonTransform(function (data, file) {
       let faq = {}
       data['section-main'].sections.forEach((section) => {
         section.accordion.forEach((faqEntry) => {
           let searchEntry = faqEntry.title + " " + faqEntry.textblock.join(" ");
-          faq[faqEntry.anchor] = searchEntry.toLowerCase();
+          faq[faqEntry.anchor] = searchEntry.toLowerCase().replace( /(<([^>]+)>)/ig, ' ');
         })
       });
       return faq;
     }))
-    .pipe(gulp.dest(PATHS.dist + "/assets/data"));
+    .pipe(rename('faq.json'))
+    .pipe(gulp.dest(PATHS.dist + `/${lang}/faq/`));
+}
+
+function copyFAQRedirects() {
+  return gulp.src("src/data/faq_redirects.json").pipe(gulp.dest(PATHS.dist + "/assets/data"));
 }
 
 // Start a server with BrowserSync to preview the site in
@@ -260,6 +287,21 @@ function build_sitemap() {
         // Reduce priority by 0.2 per level
         return 1.0 - (entry.file.split('/').length - 1) * 0.2
       }
+    }))
+    .pipe(gulp.dest(PATHS.dist))
+}
+
+// Just takes the properly build .html files and removes the ending
+function createFaqRedirects() {
+  return gulp
+    .src([PATHS.dist + "/**/faq/*.html", "!" + PATHS.dist + '/**/faq/index.html'])
+    .pipe(rename(function (path) {
+      // Returns a completely new object, make sure you return all keys needed!
+      return {
+        dirname: path.dirname,
+        basename: path.basename,
+        extname: ""
+      };
     }))
     .pipe(gulp.dest(PATHS.dist))
 }

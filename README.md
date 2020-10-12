@@ -49,6 +49,10 @@ npm start
 
 It will automatically use `public` as base directory and watch for file changes. Go to `localhost:8000` to view the website.
 
+### Changing Things
+
+Manuals for the most common use cases of updating website content are available in the [docs folder](./docs/).
+
 ### Testing
 
 [Cypress](https://docs.cypress.io/guides/overview/why-cypress.html#In-a-nutshell) is used to run End-To-End tests. tests are located in the ```cypress/integration``` folder and can be run with:
@@ -57,7 +61,7 @@ It will automatically use `public` as base directory and watch for file changes.
   npm run test:prepare
   npm run test
 ```
-Alternatively, run `npm run test:open` for simpler test development. Be aware that you should only run ony file after another and not click on _Run all specs_ since the screenshot test library has a bug which causes falsy tests for _Visual Comparison_.
+Alternatively, run `npm run test:open` for simpler test development. Be aware that you should only run one file after another and not click on _Run all specs_ since the screenshot test library has a bug which causes falsy tests for _Visual Comparison_.
 
 `npm run test:prepare` copies fixtures from `./cypress/fixtures` that are required for e2e tests. Store your test assets there, if required.
 
